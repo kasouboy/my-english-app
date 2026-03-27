@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="瞬間英作文アプリ", layout="wide")
 
 # ---------------------------------------------------------
-# 今ある JSON ファイルだけの FILE_MAP（完全一致版）
+# 今ある JSON ファイルだけの FILE_MAP
 # ---------------------------------------------------------
 FILE_MAP = {
     "第2文型（SVC）": "data/bunkei2.json",
@@ -43,12 +43,31 @@ FILE_MAP = {
 }
 
 # ---------------------------------------------------------
-# JSON 読み込み
+# JSON 読み込み（安全版）
 # ---------------------------------------------------------
 def load_questions(category):
     path = FILE_MAP[category]
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    # 形式が dict の場合 → list に変換
+    if isinstance(data, dict):
+        data = [data]
+
+    # 形式が list で、要素が str の場合 → 自動変換
+    safe_list = []
+    for item in data:
+        if isinstance(item, dict):
+            # キー名が違う場合にも対応
+            jp = item.get("japanese") or item.get("jp") or item.get("ja") or ""
+            en = item.get("english") or item.get("en") or item.get("answer") or ""
+        else:
+            # item が文字列の場合
+            jp = item
+            en = ""
+        safe_list.append({"japanese": jp, "english": en})
+
+    return safe_list
 
 # ---------------------------------------------------------
 # 履歴DB
@@ -145,6 +164,7 @@ elif mode == "履歴":
 elif mode == "管理":
     st.header("⚙ 管理モード")
     st.write("ここに問題追加機能などを配置できます。")
+
 
 
 
