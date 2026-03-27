@@ -10,30 +10,39 @@ from datetime import datetime
 st.set_page_config(page_title="瞬間英作文アプリ", layout="wide")
 
 # ---------------------------------------------------------
-# カテゴリとファイルマップ（文法カテゴリすべて統合）
+# 今ある JSON ファイルだけの FILE_MAP（完全版）
 # ---------------------------------------------------------
 FILE_MAP = {
-    "基本文型": "data/basic.json",
-    "動詞": "data/verb.json",
-    "助動詞": "data/modal.json",
-    "時制": "data/tense.json",
-    "文法": "data/grammar.json",
+    "第2文型（SVC）": "data/bunkei2.json",
+    "第3文型（SVO）": "data/bunkei3.json",
+    "第4文型（SVOO）": "data/bunkei4.json",
+    "第5文型（SVOC）": "data/bunkei5.json",
 
-    # 追加してきた動詞シリーズ
+    "現在形": "data/present_simple.json",
+    "過去形": "data/past_simple.json",
+    "未来形": "data/future_simple.json",
+
+    "現在完了形": "data/present_perfect.json",
+    "受動態": "data/passive.json",
+    "動名詞": "data/gerund.json",
+    "不定詞": "data/infinitive.json",
+
+    "現在進行形": "data/present_continuous.json",
+    "現在完了進行形": "data/present_perfect_continuous.json",
+
+    "関係代名詞": "data/relative_pronoun.json",
+    "仮定法": "data/conditional.json",
+
+    "動詞": "data/verb.json",
     "take": "data/take.json",
     "make": "data/make.json",
     "keep": "data/keep.json",
     "shall": "data/shall.json",
+    "can": "data/can.json",
+
     "get": "data/get.json",
     "have": "data/have.json",
-    "give": "data/give.json",
-    "put": "data/put.json",
-    "bring": "data/bring.json",
-    "go": "data/go.json",
-    "come": "data/come.json",
-    "see": "data/see.json",
-    "look": "data/look.json",
-    "watch": "data/watch.json",
+    "give": "data/give.json"
 }
 
 # ---------------------------------------------------------
@@ -91,7 +100,7 @@ st.title("📘 瞬間英作文トレーニング")
 # ★ サイドバー完全廃止 → メイン画面にメニュー配置
 mode = st.selectbox(
     "モードを選択してください",
-    ["トレーニング", "管理", "履歴"],
+    ["トレーニング", "履歴", "管理"],
     index=0
 )
 
@@ -123,13 +132,6 @@ if mode == "トレーニング":
             st.error("記録しました！")
 
 # ---------------------------------------------------------
-# 管理モード
-# ---------------------------------------------------------
-elif mode == "管理":
-    st.header("⚙ 管理モード")
-    st.write("ここに問題追加機能などを配置できます。")
-
-# ---------------------------------------------------------
 # 履歴モード
 # ---------------------------------------------------------
 elif mode == "履歴":
@@ -140,6 +142,14 @@ elif mode == "履歴":
 
     for row in rows:
         st.write(f"【{row[5]}】 {row[1]} / {row[2]} → {row[4]}")
+
+# ---------------------------------------------------------
+# 管理モード（今は空）
+# ---------------------------------------------------------
+elif mode == "管理":
+    st.header("⚙ 管理モード")
+    st.write("ここに問題追加機能などを配置できます。")
+
 
 
 
