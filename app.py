@@ -5,20 +5,13 @@ import sqlite3
 import os
 from datetime import datetime
 
-# =========================================
-#  絶対パスの設定（history.db の nul 問題対策）
-# =========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "history.db")
 
-# =========================================
-#  SQLite 初期化（最新5000件だけ残す & correct カラム追加）
-# =========================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # テーブル作成
     c.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,13 +23,11 @@ def init_db():
         )
     """)
 
-    # correct カラムがない場合に追加（既存DB対応）
     try:
         c.execute("ALTER TABLE history ADD COLUMN correct INTEGER")
     except:
         pass
 
-    # ★ 最新5000件だけ残す
     c.execute("""
         DELETE FROM history
         WHERE id NOT IN (
@@ -46,7 +37,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
 
 def write_history(pattern, jp, en, correct):
     conn = sqlite3.connect(DB_PATH)
@@ -58,9 +48,6 @@ def write_history(pattern, jp, en, correct):
     conn.commit()
     conn.close()
 
-# =========================================
-#  JSON 読み込み・保存
-# =========================================
 def load_questions(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -69,9 +56,6 @@ def save_questions(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# =========================================
-#  文型・文法カテゴリのマッピング（最新版）
-# =========================================
 FILE_MAP = {
     "第2文型（SVC）": "data/bunkei2.json",
     "第3文型（SVO）": "data/bunkei3.json",
@@ -105,26 +89,24 @@ FILE_MAP = {
     "give": "data/give.json"
 }
 
-# DB 初期化
 init_db()
 
 # =========================================
-#  サイドバー：モード選択
+# ★ サイドバー廃止 → メイン画面に移動
 # =========================================
-st.sidebar.title("設定")
-mode = st.sidebar.radio("モード選択", ["トレーニング", "苦手問題", "管理", "履歴を見る"])
+st.title("瞬間英作文アプリ")
 
-pattern = st.sidebar.selectbox("文型・文法を選択", list(FILE_MAP.keys()))
+mode = st.selectbox("モード選択", ["トレーニング", "苦手問題", "管理", "履歴を見る"])
+pattern = st.selectbox("文型・文法を選択", list(FILE_MAP.keys()))
 file_path = FILE_MAP[pattern]
 
-# JSON 読み込み
 questions = load_questions(file_path)
 
 # =========================================
-#  ① トレーニングモード
+# ① トレーニング
 # =========================================
 if mode == "トレーニング":
-    st.title("瞬間英作文トレーニング")
+    st.header("瞬間英作文トレーニング")
 
     if "current" not in st.session_state:
         st.session_state.current = random.choice(questions)
@@ -159,15 +141,13 @@ if mode == "トレーニング":
                 st.rerun()
 
 # =========================================
-#  ② 苦手問題モード（不正解だけ出題）
+# ② 苦手問題
 # =========================================
 elif mode == "苦手問題":
-    st.title("苦手問題トレーニング（不正解だった問題のみ）")
+    st.header("苦手問題トレーニング")
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
-    # 過去に間違えた問題だけ取得
     c.execute("""
         SELECT pattern, jp, en FROM history
         WHERE correct = 0
@@ -177,7 +157,7 @@ elif mode == "苦手問題":
     conn.close()
 
     if len(wrong_rows) == 0:
-        st.info("苦手問題はありません！（すべて正解しています）")
+        st.info("苦手問題はありません！")
     else:
         pattern, jp, en = random.choice(wrong_rows)
 
@@ -206,10 +186,10 @@ elif mode == "苦手問題":
                     st.rerun()
 
 # =========================================
-#  ③ 管理モード（問題追加）
+# ③ 管理
 # =========================================
 elif mode == "管理":
-    st.title("問題管理画面")
+    st.header("問題管理画面")
 
     st.write(f"現在のカテゴリ：**{pattern}**")
     st.write(f"ファイル：**{file_path}**")
@@ -235,15 +215,14 @@ elif mode == "管理":
         st.write(f"- **JP:** {q['jp']} / **EN:** {q['en']}")
 
 # =========================================
-#  ④ 履歴を見る（SQLite）
+# ④ 履歴
 # =========================================
 else:
-    st.title("出題履歴（最新5000件まで保持）")
+    st.header("出題履歴（最新5000件まで保持）")
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # 正答率計算
     c.execute("SELECT COUNT(*), SUM(correct) FROM history")
     total, correct = c.fetchone()
 
@@ -253,7 +232,6 @@ else:
     else:
         st.subheader("まだ正答データがありません。")
 
-    # 履歴一覧
     c.execute("SELECT datetime, pattern, jp, en, correct FROM history ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
@@ -265,6 +243,7 @@ else:
         st.write(f"- JP: {jp}")
         st.write(f"- EN: {en}")
         st.write("---")
+
 
 
 
