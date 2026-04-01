@@ -284,6 +284,99 @@ else:
         st.write(f"- EN: {en}")
         st.write("---")
 
+    # =========================================
+    # ★ 学習の記録（A〜E＋学習時間）
+    # =========================================
+    st.header("📘 学習の記録")
+
+    # DB 再取得（datetime を日付ごとに集計するため）
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT datetime, pattern, correct FROM history ORDER BY datetime ASC")
+    logs = c.fetchall()
+    conn.close()
+
+    if len(logs) == 0:
+        st.info("まだ学習データがありません。")
+    else:
+        # 日別集計用
+        daily_count = {}       # A: 日別の学習量
+        daily_correct = {}     # B: 日別の正答率
+        daily_time = {}        # D: 日別の学習時間（分）
+
+        # カテゴリ別集計用
+        category_count = {}    # C: カテゴリ別の学習量
+        category_correct = {}  # C: カテゴリ別の正答率
+
+        # 日別の最初と最後の時間を記録
+        first_time = {}
+        last_time = {}
+
+        for dt, pat, cor in logs:
+            date = dt.split(" ")[0]  # YYYY-MM-DD
+
+            # A: 日別の学習量
+            daily_count[date] = daily_count.get(date, 0) + 1
+
+            # B: 日別の正答率
+            if date not in daily_correct:
+                daily_correct[date] = {"correct": 0, "total": 0}
+            daily_correct[date]["total"] += 1
+            if cor == 1:
+                daily_correct[date]["correct"] += 1
+
+            # C: カテゴリ別
+            category_count[pat] = category_count.get(pat, 0) + 1
+            if pat not in category_correct:
+                category_correct[pat] = {"correct": 0, "total": 0}
+            category_correct[pat]["total"] += 1
+            if cor == 1:
+                category_correct[pat]["correct"] += 1
+
+            # D: 日別の学習時間
+            if date not in first_time:
+                first_time[date] = dt
+            last_time[date] = dt
+
+        # 学習時間（分）を算出
+        from datetime import datetime as dt2
+        for date in first_time:
+            t1 = dt2.strptime(first_time[date], "%Y-%m-%d %H:%M:%S")
+            t2 = dt2.strptime(last_time[date], "%Y-%m-%d %H:%M:%S")
+            minutes = int((t2 - t1).total_seconds() / 60)
+            daily_time[date] = minutes
+
+        # =========================================
+        # A: 日別の学習量
+        # =========================================
+        st.subheader("📅 日別の学習量（A）")
+        for date, count in daily_count.items():
+            st.write(f"- {date}：{count}問")
+
+        # =========================================
+        # B: 日別の正答率
+        # =========================================
+        st.subheader("🎯 日別の正答率（B）")
+        for date, data in daily_correct.items():
+            acc = (data["correct"] / data["total"]) * 100
+            st.write(f"- {date}：{acc:.1f}%")
+
+        # =========================================
+        # D: 日別の学習時間
+        # =========================================
+        st.subheader("⏱ 日別の学習時間（D）")
+        for date, minutes in daily_time.items():
+            st.write(f"- {date}：{minutes}分")
+
+        # =========================================
+        # C: カテゴリ別の学習量・正答率
+        # =========================================
+        st.subheader("📚 カテゴリ別の学習量・正答率（C）")
+        for pat in category_count:
+            total = category_correct[pat]["total"]
+            cor = category_correct[pat]["correct"]
+            acc = (cor / total) * 100
+            st.write(f"- {pat}：{total}問（正答率 {acc:.1f}%）")
 
 
 
