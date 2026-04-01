@@ -114,7 +114,7 @@ init_db()
 # ★ タイトルをスマホで1行に収めるCSS
 st.markdown("""
     <style>
-    h1 {
+    h1, h2 {
         font-size: 1.6rem !important;
         white-space: nowrap !important;
     }
