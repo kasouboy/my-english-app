@@ -111,6 +111,16 @@ init_db()
 # =========================================
 #  ★ サイドバー廃止 → メイン画面に移動
 # =========================================
+# ★ タイトルをスマホで1行に収めるCSS
+st.markdown("""
+    <style>
+    h1 {
+        font-size: 1.6rem !important;
+        white-space: nowrap !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("瞬間英作文アプリ")
 
 mode = st.selectbox("モード選択", ["トレーニング", "苦手問題", "管理", "履歴を見る"])
