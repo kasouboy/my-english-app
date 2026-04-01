@@ -109,9 +109,8 @@ FILE_MAP = {
 init_db()
 
 # =========================================
-#  ★ サイドバー廃止 → メイン画面に移動
+# ★ タイトルとヘッダーをスマホで1行に収めるCSS
 # =========================================
-# ★ タイトルをスマホで1行に収めるCSS
 st.markdown("""
     <style>
     h1, h2 {
@@ -121,6 +120,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# =========================================
+#  ★ サイドバー廃止 → メイン画面に移動
+# =========================================
 st.title("瞬間英作文アプリ")
 
 mode = st.selectbox("モード選択", ["トレーニング", "苦手問題", "管理", "履歴を見る"])
@@ -255,7 +257,7 @@ elif mode == "管理":
         st.write(f"- **JP:** {q['jp']} / **EN:** {q['en']}")
 
 # =========================================
-#  ④ 履歴を見る
+#  ④ 履歴を見る（学習記録＋棒グラフ）
 # =========================================
 else:
     st.title("出題履歴（最新5000件まで保持）")
@@ -289,7 +291,6 @@ else:
     # =========================================
     st.header("📘 学習の記録")
 
-    # DB 再取得（datetime を日付ごとに集計するため）
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT datetime, pattern, correct FROM history ORDER BY datetime ASC")
@@ -299,33 +300,25 @@ else:
     if len(logs) == 0:
         st.info("まだ学習データがありません。")
     else:
-        # 日別集計用
-        daily_count = {}       # A: 日別の学習量
-        daily_correct = {}     # B: 日別の正答率
-        daily_time = {}        # D: 日別の学習時間（分）
-
-        # カテゴリ別集計用
-        category_count = {}    # C: カテゴリ別の学習量
-        category_correct = {}  # C: カテゴリ別の正答率
-
-        # 日別の最初と最後の時間を記録
+        daily_count = {}
+        daily_correct = {}
+        daily_time = {}
+        category_count = {}
+        category_correct = {}
         first_time = {}
         last_time = {}
 
         for dt, pat, cor in logs:
-            date = dt.split(" ")[0]  # YYYY-MM-DD
+            date = dt.split(" ")[0]
 
-            # A: 日別の学習量
             daily_count[date] = daily_count.get(date, 0) + 1
 
-            # B: 日別の正答率
             if date not in daily_correct:
                 daily_correct[date] = {"correct": 0, "total": 0}
             daily_correct[date]["total"] += 1
             if cor == 1:
                 daily_correct[date]["correct"] += 1
 
-            # C: カテゴリ別
             category_count[pat] = category_count.get(pat, 0) + 1
             if pat not in category_correct:
                 category_correct[pat] = {"correct": 0, "total": 0}
@@ -333,12 +326,10 @@ else:
             if cor == 1:
                 category_correct[pat]["correct"] += 1
 
-            # D: 日別の学習時間
             if date not in first_time:
                 first_time[date] = dt
             last_time[date] = dt
 
-        # 学習時間（分）を算出
         from datetime import datetime as dt2
         for date in first_time:
             t1 = dt2.strptime(first_time[date], "%Y-%m-%d %H:%M:%S")
@@ -346,37 +337,56 @@ else:
             minutes = int((t2 - t1).total_seconds() / 60)
             daily_time[date] = minutes
 
-        # =========================================
-        # A: 日別の学習量
-        # =========================================
         st.subheader("📅 日別の学習量（A）")
         for date, count in daily_count.items():
             st.write(f"- {date}：{count}問")
 
-        # =========================================
-        # B: 日別の正答率
-        # =========================================
         st.subheader("🎯 日別の正答率（B）")
         for date, data in daily_correct.items():
             acc = (data["correct"] / data["total"]) * 100
             st.write(f"- {date}：{acc:.1f}%")
 
-        # =========================================
-        # D: 日別の学習時間
-        # =========================================
         st.subheader("⏱ 日別の学習時間（D）")
         for date, minutes in daily_time.items():
             st.write(f"- {date}：{minutes}分")
 
-        # =========================================
-        # C: カテゴリ別の学習量・正答率
-        # =========================================
         st.subheader("📚 カテゴリ別の学習量・正答率（C）")
         for pat in category_count:
             total = category_correct[pat]["total"]
             cor = category_correct[pat]["correct"]
             acc = (cor / total) * 100
             st.write(f"- {pat}：{total}問（正答率 {acc:.1f}%）")
+
+        # =========================================
+        # ★ 棒グラフの表示
+        # =========================================
+        import pandas as pd
+
+        st.subheader("📊 棒グラフで見る学習記録")
+
+        st.write("### 日別の学習量（A）")
+        df_daily_count = pd.DataFrame({
+            "date": list(daily_count.keys()),
+            "count": list(daily_count.values())
+        }).sort_values("date")
+        st.bar_chart(df_daily_count, x="date", y="count")
+
+        st.write("### 日別の正答率（B）")
+        df_daily_acc = pd.DataFrame({
+            "date": list(daily_correct.keys()),
+            "accuracy": [
+                (v["correct"] / v["total"]) * 100 for v in daily_correct.values()
+            ]
+        }).sort_values("date")
+        st.bar_chart(df_daily_acc, x="date", y="accuracy")
+
+        st.write("### カテゴリ別の学習量（C）")
+        df_cat_count = pd.DataFrame({
+            "category": list(category_count.keys()),
+            "count": list(category_count.values())
+        }).sort_values("count", ascending=False)
+        st.bar_chart(df_cat_count, x="category", y="count")
+
 
 
 
