@@ -6,19 +6,32 @@ import os
 from datetime import datetime
 
 # =========================================
-#  絶対パスの設定（history.db の nul 問題対策）
+#  絶対パスの設定
 # =========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "history.db")
 
 # =========================================
-#  SQLite 初期化（最新5000件だけ残す & correct カラム追加）
+#  datetime パーサー（ミリ秒あり/なし対応）
+# =========================================
+def parse_datetime(dt_str):
+    try:
+        return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S.%f")
+    except:
+        pass
+    try:
+        return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+    except:
+        pass
+    return None
+
+# =========================================
+#  SQLite 初期化
 # =========================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # テーブル作成
     c.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,13 +43,11 @@ def init_db():
         )
     """)
 
-    # correct カラムがない場合に追加（既存DB対応）
     try:
         c.execute("ALTER TABLE history ADD COLUMN correct INTEGER")
     except:
         pass
 
-    # ★ 最新5000件だけ残す
     c.execute("""
         DELETE FROM history
         WHERE id NOT IN (
@@ -46,7 +57,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
 
 def write_history(pattern, jp, en, correct):
     conn = sqlite3.connect(DB_PATH)
@@ -59,7 +69,7 @@ def write_history(pattern, jp, en, correct):
     conn.close()
 
 # =========================================
-#  JSON 読み込み・保存
+#  JSON 読み込み
 # =========================================
 def load_questions(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -70,7 +80,7 @@ def save_questions(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # =========================================
-#  文型・文法カテゴリのマッピング（最新版）
+#  FILE MAP
 # =========================================
 FILE_MAP = {
     "第2文型（SVC）": "data/bunkei2.json",
@@ -109,7 +119,7 @@ FILE_MAP = {
 init_db()
 
 # =========================================
-# ★ タイトルとヘッダーをスマホで1行に収めるCSS
+#  タイトルをスマホで1行に
 # =========================================
 st.markdown("""
     <style>
@@ -121,19 +131,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================
-#  ★ サイドバー廃止 → メイン画面に移動
+#  UI
 # =========================================
 st.title("瞬間英作文アプリ")
 
 mode = st.selectbox("モード選択", ["トレーニング", "苦手問題", "管理", "履歴を見る"])
 pattern = st.selectbox("文型・文法を選択", list(FILE_MAP.keys()))
 file_path = FILE_MAP[pattern]
-
-# JSON 読み込み
 questions = load_questions(file_path)
 
 # =========================================
-# ★ 文型・文法を変更したら問題をリセット
+#  文型変更で問題リセット
 # =========================================
 if "last_pattern" not in st.session_state:
     st.session_state.last_pattern = pattern
@@ -144,7 +152,7 @@ if st.session_state.last_pattern != pattern:
     st.session_state.last_pattern = pattern
 
 # =========================================
-#  ① トレーニングモード
+#  トレーニング
 # =========================================
 if mode == "トレーニング":
     st.header("瞬間英作文トレーニング")
@@ -182,14 +190,13 @@ if mode == "トレーニング":
                 st.rerun()
 
 # =========================================
-#  ② 苦手問題モード
+#  苦手問題
 # =========================================
 elif mode == "苦手問題":
-    st.title("苦手問題トレーニング（不正解だった問題のみ）")
+    st.title("苦手問題トレーニング（不正解のみ）")
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
     c.execute("""
         SELECT pattern, jp, en FROM history
         WHERE correct = 0
@@ -199,7 +206,7 @@ elif mode == "苦手問題":
     conn.close()
 
     if len(wrong_rows) == 0:
-        st.info("苦手問題はありません！（すべて正解しています）")
+        st.info("苦手問題はありません！")
     else:
         pattern, jp, en = random.choice(wrong_rows)
 
@@ -228,7 +235,7 @@ elif mode == "苦手問題":
                     st.rerun()
 
 # =========================================
-#  ③ 管理モード
+#  管理
 # =========================================
 elif mode == "管理":
     st.title("問題管理画面")
@@ -257,40 +264,35 @@ elif mode == "管理":
         st.write(f"- **JP:** {q['jp']} / **EN:** {q['en']}")
 
 # =========================================
-#  ④ 履歴を見る（学習記録＋棒グラフ）
+#  履歴 + 学習記録 + 棒グラフ
 # =========================================
 else:
-    st.title("出題履歴（最新5000件まで保持）")
+    st.title("学習データ")
 
+    # -------------------------
+    # 履歴データ取得
+    # -------------------------
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
-    c.execute("SELECT COUNT(*), SUM(correct) FROM history")
-    total, correct = c.fetchone()
-
-    if total and total > 0:
-        accuracy = (correct / total) * 100
-        st.subheader(f"全体の正答率：{accuracy:.1f}%")
-    else:
-        st.subheader("まだ正答データがありません。")
-
     c.execute("SELECT datetime, pattern, jp, en, correct FROM history ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
 
-    for row in rows:
-        dt, pat, jp, en, correct = row
-        result = "⭕ 正解" if correct == 1 else "❌ 不正解"
-        st.write(f"**{dt}** / {pat} / {result}")
-        st.write(f"- JP: {jp}")
-        st.write(f"- EN: {en}")
-        st.write("---")
+    # -------------------------
+    # 履歴は折りたたみ
+    # -------------------------
+    with st.expander("▼ 出題履歴（タップで開く）"):
+        for row in rows:
+            dt, pat, jp, en, correct = row
+            result = "⭕ 正解" if correct == 1 else "❌ 不正解"
+            st.write(f"**{dt}** / {pat} / {result}")
+            st.write(f"- JP: {jp}")
+            st.write(f"- EN: {en}")
+            st.write("---")
 
-    # =========================================
-    # ★ 学習の記録（A〜E＋学習時間）
-    # =========================================
-    st.header("📘 学習の記録")
-
+    # -------------------------
+    # 学習記録用データ取得
+    # -------------------------
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT datetime, pattern, correct FROM history ORDER BY datetime ASC")
@@ -330,12 +332,49 @@ else:
                 first_time[date] = dt
             last_time[date] = dt
 
-        from datetime import datetime as dt2
         for date in first_time:
-            t1 = dt2.strptime(first_time[date], "%Y-%m-%d %H:%M:%S")
-            t2 = dt2.strptime(last_time[date], "%Y-%m-%d %H:%M:%S")
-            minutes = int((t2 - t1).total_seconds() / 60)
+            t1 = parse_datetime(first_time[date])
+            t2 = parse_datetime(last_time[date])
+            if t1 and t2:
+                minutes = int((t2 - t1).total_seconds() / 60)
+            else:
+                minutes = 0
             daily_time[date] = minutes
+
+        # -------------------------
+        # 棒グラフを最初に表示
+        # -------------------------
+        import pandas as pd
+
+        st.header("📊 棒グラフで見る学習記録")
+
+        df_daily_count = pd.DataFrame({
+            "date": list(daily_count.keys()),
+            "count": list(daily_count.values())
+        }).sort_values("date")
+        st.write("### 日別の学習量（A）")
+        st.bar_chart(df_daily_count, x="date", y="count")
+
+        df_daily_acc = pd.DataFrame({
+            "date": list(daily_correct.keys()),
+            "accuracy": [
+                (v["correct"] / v["total"]) * 100 for v in daily_correct.values()
+            ]
+        }).sort_values("date")
+        st.write("### 日別の正答率（B）")
+        st.bar_chart(df_daily_acc, x="date", y="accuracy")
+
+        df_cat_count = pd.DataFrame({
+            "category": list(category_count.keys()),
+            "count": list(category_count.values())
+        }).sort_values("count", ascending=False)
+        st.write("### カテゴリ別の学習量（C）")
+        st.bar_chart(df_cat_count, x="category", y="count")
+
+        # -------------------------
+        # 学習記録（テキスト）
+        # -------------------------
+        st.header("📘 学習の記録")
 
         st.subheader("📅 日別の学習量（A）")
         for date, count in daily_count.items():
@@ -357,35 +396,6 @@ else:
             acc = (cor / total) * 100
             st.write(f"- {pat}：{total}問（正答率 {acc:.1f}%）")
 
-        # =========================================
-        # ★ 棒グラフの表示
-        # =========================================
-        import pandas as pd
-
-        st.subheader("📊 棒グラフで見る学習記録")
-
-        st.write("### 日別の学習量（A）")
-        df_daily_count = pd.DataFrame({
-            "date": list(daily_count.keys()),
-            "count": list(daily_count.values())
-        }).sort_values("date")
-        st.bar_chart(df_daily_count, x="date", y="count")
-
-        st.write("### 日別の正答率（B）")
-        df_daily_acc = pd.DataFrame({
-            "date": list(daily_correct.keys()),
-            "accuracy": [
-                (v["correct"] / v["total"]) * 100 for v in daily_correct.values()
-            ]
-        }).sort_values("date")
-        st.bar_chart(df_daily_acc, x="date", y="accuracy")
-
-        st.write("### カテゴリ別の学習量（C）")
-        df_cat_count = pd.DataFrame({
-            "category": list(category_count.keys()),
-            "count": list(category_count.values())
-        }).sort_values("count", ascending=False)
-        st.bar_chart(df_cat_count, x="category", y="count")
 
 
 
